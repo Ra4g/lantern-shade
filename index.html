@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lantern & Shade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<style>
+:root{
+  --night:#141A44; --night-2:#0D1236; --panel:#1B2257; --line:#343E86;
+  --ink:#ECE7F8; --muted:#A4A9D2; --amber:#FFB547; --amber-soft:#FFDB94;
+  --violet:#A597FF; --violet-deep:#2B2266;
+  color-scheme:dark; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --night:#10163A; --night-2:#0A0F2C; --panel:#161D4A; --line:#2E3672; }
+}
+:root[data-theme="dark"]{ --night:#10163A; --night-2:#0A0F2C; --panel:#161D4A; --line:#2E3672; }
+html{ height:100%; scroll-padding-top:env(safe-area-inset-top,0px); }
+body{ height:100%; margin:0; background:var(--night-2); color:var(--ink);
+  font-family:Figtree, "Segoe UI", system-ui, -apple-system, sans-serif; font-size:15px; line-height:1.45; overflow:hidden; }
+*,*::before,*::after{ box-sizing:border-box; }
+#app{ height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:10px; }
+.bar{ display:flex; justify-content:space-between; align-items:baseline; gap:16px; max-width:100%; }
+#lvl-name{ font-family:"IM Fell English", Georgia, serif; font-size:22px; color:var(--amber-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#status{ color:var(--muted); font-size:13px; white-space:nowrap; }
+#status .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:#6b6f95; vertical-align:1px; }
+#status .dot.on{ background:#7BE0B0; }
+#stage{ position:relative; }
+#c{ display:block; border-radius:6px; box-shadow:0 0 0 1px var(--line); cursor:crosshair; }
+#hud-bottom{ display:flex; flex-direction:column; gap:2px; }
+#hint{ font-size:14px; color:var(--ink); }
+#hint b{ font-weight:600; }
+#hint .l{ color:var(--amber); } #hint .s{ color:var(--violet); }
+#controls{ font-size:12.5px; color:var(--muted); }
+#banner{ position:absolute; left:50%; top:14%; transform:translateX(-50%); padding:8px 18px; border-radius:999px;
+  background:rgba(13,18,54,.85); border:1px solid var(--line); font-size:14px; pointer-events:none; display:none; white-space:nowrap; }
+#banner.show{ display:block; }
+
+.screen{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:radial-gradient(ellipse at 50% 40%, rgba(20,26,68,.55), rgba(8,11,34,.92)); overflow:auto; z-index:5; }
+.screen.hidden{ display:none; }
+.sheet{ width:min(640px,100%); }
+.title{ font-family:"IM Fell English", Georgia, serif; font-weight:400; font-size:clamp(52px,10vw,118px); line-height:.95; margin:0 0 18px;
+  color:transparent; background:radial-gradient(circle at var(--mx,30%) var(--my,50%), #FFF1C9 0, #FFB547 70px, #9A7BD8 170px, #3A3A7A 280px);
+  -webkit-background-clip:text; background-clip:text; letter-spacing:-.01em; }
+.title em{ font-style:italic; }
+.lede{ font-size:17px; color:var(--muted); max-width:34em; margin:0 0 28px; }
+.row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+button{ font:inherit; }
+.btn{ font-weight:600; font-size:15px; padding:11px 20px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
+.btn:hover{ border-color:var(--muted); }
+.btn.primary{ background:var(--amber); color:#2A1A00; border-color:var(--amber); }
+.btn.primary:hover{ background:var(--amber-soft); }
+.btn:disabled{ opacity:.45; cursor:not-allowed; }
+.btn:focus-visible, input:focus-visible, .role:focus-visible, .chip:focus-visible{ outline:2px solid var(--amber-soft); outline-offset:2px; }
+input.code{ font:600 18px Figtree, sans-serif; letter-spacing:.3em; text-transform:uppercase; width:8.2em; padding:10px 14px; border-radius:999px;
+  border:1px solid var(--line); background:var(--night-2); color:var(--ink); }
+.note{ font-size:13px; color:var(--muted); margin-top:18px; max-width:40em; }
+.divider{ height:1px; background:var(--line); margin:22px 0; }
+h2{ font-family:"IM Fell English", Georgia, serif; font-weight:400; font-size:34px; margin:0 0 6px; }
+h3{ font-size:15px; font-weight:600; margin:0 0 10px; color:var(--muted); }
+.codebig{ font:700 44px Figtree, sans-serif; letter-spacing:.18em; color:var(--amber-soft); }
+.roles{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:18px 0; }
+@media (max-width:560px){ .roles{ grid-template-columns:1fr; } }
+.role{ text-align:left; padding:16px; border-radius:14px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
+.role .who{ font-size:12.5px; color:var(--muted); margin-top:10px; }
+.role .nm{ font-family:"IM Fell English", Georgia, serif; font-size:26px; }
+.role p{ margin:6px 0 0; font-size:13.5px; color:var(--muted); }
+.role.lantern .nm{ color:var(--amber); } .role.shade .nm{ color:var(--violet); }
+.role.mine.lantern{ border-color:var(--amber); box-shadow:inset 0 0 0 1px var(--amber); }
+.role.mine.shade{ border-color:var(--violet); box-shadow:inset 0 0 0 1px var(--violet); }
+.role:disabled{ opacity:.5; cursor:not-allowed; }
+.chips{ display:flex; flex-wrap:wrap; gap:8px; }
+.chip{ padding:7px 13px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; font-size:13.5px; }
+.chip.on{ background:var(--ink); color:var(--night-2); border-color:var(--ink); }
+.why{ font-size:13.5px; color:var(--muted); margin-left:6px; }
+#toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--panel); border:1px solid var(--line);
+  padding:10px 16px; border-radius:10px; font-size:14px; z-index:9; display:none; max-width:90vw; }
+#toast.show{ display:block; }
+@media (prefers-reduced-motion: reduce){ .title{ background:linear-gradient(90deg,#FFB547,#A597FF); -webkit-background-clip:text; background-clip:text; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="bar" id="hud-top"><div id="lvl-name">Lantern & Shade</div><div id="status"></div></div>
+  <div id="stage"><canvas id="c" width="960" height="540" aria-label="Game board"></canvas><div id="banner"></div></div>
+  <div id="hud-bottom"><div id="hint"></div><div id="controls"></div></div>
+</div>
+
+<!-- Title -->
+<div class="screen" id="scr-title">
+  <div class="sheet">
+    <h1 class="title" id="title">Lantern <em>&amp;</em><br>Shade</h1>
+    <p class="lede">A two-player puzzle about light and the dark that needs it. One of you carries the lantern. The other can only survive in shadow, and neither of you gets home alone.</p>
+    <div class="row">
+      <button class="btn primary" id="btn-create">Create a room</button>
+      <input class="code" id="in-code" maxlength="4" placeholder="CODE" aria-label="Room code" autocomplete="off" spellcheck="false">
+      <button class="btn" id="btn-join">Join room</button>
+    </div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="btn-local">Play on one keyboard</button></div>
+    <p class="note" id="online-note"></p>
+  </div>
+</div>
+
+<!-- Lobby -->
+<div class="screen hidden" id="scr-lobby">
+  <div class="sheet">
+    <h3>Room code</h3>
+    <div class="row" style="gap:14px"><div class="codebig" id="room-code">----</div><button class="btn" id="btn-copy">Copy code</button></div>
+    <p class="note" id="partner-line" style="margin-top:8px">Waiting for a friend to join.</p>
+    <div class="roles">
+      <button class="role lantern" id="role-lantern" data-role="lantern">
+        <div class="nm">Lantern</div>
+        <p>Carries the light. Golden bridges only hold while lit. Hold down to dim the lantern so your partner can slip past.</p>
+        <div class="who">Open</div>
+      </button>
+      <button class="role shade" id="role-shade" data-role="shade">
+        <div class="nm">Shade</div>
+        <p>Lives in the dark. Walks on violet ledges, drifts through mist walls, jumps twice. Light burns.</p>
+        <div class="who">Open</div>
+      </button>
+    </div>
+    <h3>Level</h3>
+    <div class="chips" id="lobby-levels"></div>
+    <div class="divider"></div>
+    <div class="row"><button class="btn primary" id="btn-start" disabled>Start</button><span class="why" id="start-why"></span></div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="btn-leave">Leave room</button></div>
+  </div>
+</div>
+
+<!-- Menu -->
+<div class="screen hidden" id="scr-menu">
+  <div class="sheet">
+    <h2>Paused</h2>
+    <p class="note" id="menu-note" style="margin:0 0 18px"></p>
+    <div class="row"><button class="btn primary" id="btn-resume">Resume</button><button class="btn" id="btn-restart">Restart level</button></div>
+    <div class="divider"></div>
+    <h3>Jump to a level</h3>
+    <div class="chips" id="menu-levels"></div>
+    <div class="divider"></div>
+    <button class="btn" id="btn-quit">Leave game</button>
+  </div>
+</div>
+
+<!-- Win -->
+<div class="screen hidden" id="scr-win">
+  <div class="sheet">
+    <h1 class="title" style="--mx:50%;--my:40%">Dawn.</h1>
+    <p class="lede">You both made it through every level. The lantern can finally rest, and the shade can finally sleep.</p>
+    <div class="row"><button class="btn primary" id="btn-again">Play again from level 1</button><button class="btn" id="btn-win-quit">Leave game</button></div>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const T = 30, COLS = 32, ROWS = 18, W = COLS * T, H = ROWS * T;
+const G = 1800, MAXFALL = 900, STEP = 1 / 120;
+const LANTERN_R = 125, SHUTTER_R = 40;
+const BURN_FILL = 0.7, BURN_RECOVER = 1.4;
+const CHC = { A: "#5CC8B8", B: "#E58FAE", C: "#A8D672" };
+const ROLES = {
+  lantern: { w: 20, h: 28, speed: 200, jump: 560, jumps: 1 },
+  shade:   { w: 20, h: 24, speed: 235, jump: 590, jumps: 2 }
+};
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------------- levels ---------------- */
+function blank() {
+  const g = [];
+  for (let y = 0; y < ROWS; y++) {
+    const r = [];
+    for (let x = 0; x < COLS; x++) r.push((y === 0 || y === ROWS - 1 || x === 0 || x === COLS - 1) ? "#" : ".");
+    g.push(r);
+  }
+  return g;
+}
+function fill(g, x0, y0, x1, y1, c) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) g[y][x] = c; }
+
+const LEVELS = [
+  { name: "First light",
+    hints: { lantern: "Golden bridges only hold while your light touches them. Hang back while the Shade crosses the violet ledges above the pit.",
+             shade: "Violet ledges only hold in darkness, and light burns you. Cross above the pit, drift through the mist wall and pull your lever." },
+    build(g) { fill(g,1,16,30,17,"#"); fill(g,10,16,15,16,"="); fill(g,10,17,15,17,"^"); fill(g,9,12,16,12,"~");
+      fill(g,17,15,17,15,"#"); fill(g,18,13,19,13,"#"); fill(g,20,1,20,9,"#"); fill(g,20,13,20,15,"|"); fill(g,21,13,22,13,"#"); },
+    ents: [ {t:"door",x:20,y:10,h:3,ch:"A"}, {t:"lever",x:24,y:15,ch:"A",who:"shade"},
+            {t:"exit",x:27,y:15,who:"shade"}, {t:"exit",x:29,y:15,who:"lantern"} ],
+    spawn: { lantern:[2,15], shade:[7,15] } },
+  { name: "Lamplighter",
+    hints: { lantern: "The lamp below floods the Shade's tunnel. Pull your lever to put it out, then wait at the gate.",
+             shade: "Wait for the lamp to go dark. Then stand on the plate to hold the Lantern's gate open." },
+    build(g) { fill(g,1,16,30,17,"#"); fill(g,1,9,27,9,"#"); fill(g,12,9,15,9,"="); fill(g,20,1,20,5,"#"); },
+    ents: [ {t:"door",x:20,y:6,h:3,ch:"C"}, {t:"lamp",x:14,y:13,r:140,ch:"B",inv:true}, {t:"lever",x:6,y:8,ch:"B",who:"lantern"},
+            {t:"plate",x:24,y:15,ch:"C"}, {t:"exit",x:22,y:15,who:"shade"}, {t:"exit",x:30,y:15,who:"lantern"} ],
+    spawn: { lantern:[2,8], shade:[2,15] } },
+  { name: "Two towers",
+    hints: { lantern: "Wait at the bottom until the Shade is at the top. Your light dissolves the ledges it climbs.",
+             shade: "Climb before the Lantern does. Your lever opens the Lantern's gate at the top of its tower." },
+    build(g) { fill(g,1,16,30,17,"#"); fill(g,3,14,5,14,"="); fill(g,6,12,8,12,"="); fill(g,9,10,11,10,"="); fill(g,12,8,15,8,"#");
+      fill(g,14,1,15,4,"#"); fill(g,16,1,16,15,"|"); fill(g,18,13,20,13,"~"); fill(g,22,10,24,10,"~"); fill(g,18,7,20,7,"~"); fill(g,21,4,30,4,"#"); },
+    ents: [ {t:"door",x:14,y:5,h:3,ch:"A"}, {t:"exit",x:15,y:7,who:"lantern"}, {t:"lever",x:24,y:3,ch:"A",who:"shade"}, {t:"exit",x:29,y:3,who:"shade"} ],
+    spawn: { lantern:[2,15], shade:[28,15] } },
+  { name: "Relay",
+    hints: { lantern: "You each hold a gate for the other. Once the Shade is past its gate, put out the lamp before it comes down.",
+             shade: "Stand on the plate on your shelf to let the Lantern through, then wait at your own gate." },
+    build(g) { fill(g,1,16,30,17,"#"); fill(g,1,6,22,6,"#"); fill(g,12,7,12,12,"#"); fill(g,20,1,20,2,"#"); fill(g,24,9,26,9,"~"); fill(g,27,12,29,12,"~"); },
+    ents: [ {t:"plate",x:8,y:5,ch:"A"}, {t:"door",x:12,y:13,h:3,ch:"A"}, {t:"plate",x:18,y:15,ch:"B"}, {t:"door",x:20,y:3,h:3,ch:"B"},
+            {t:"lamp",x:27,y:10,r:190,ch:"C",inv:true}, {t:"lever",x:23,y:15,ch:"C",who:"lantern"},
+            {t:"exit",x:14,y:15,who:"lantern"}, {t:"exit",x:30,y:15,who:"shade"} ],
+    spawn: { lantern:[2,15], shade:[2,5] } },
+  { name: "Close quarters",
+    hints: { lantern: "Hold the plate to keep the gate open, and dim your lantern while the Shade squeezes past you.",
+             shade: "The Lantern is in your way. Ask it to dim before you slip past, then pull the lever for its gate." },
+    build(g) { fill(g,1,16,30,17,"#"); fill(g,6,15,7,15,"#"); fill(g,9,13,22,13,"#"); fill(g,12,13,15,13,"="); fill(g,18,1,18,9,"#"); fill(g,23,1,23,12,"#"); },
+    ents: [ {t:"plate",x:15,y:15,ch:"A"}, {t:"door",x:23,y:13,h:3,ch:"A"}, {t:"lever",x:26,y:15,ch:"B",who:"shade"},
+            {t:"door",x:18,y:10,h:3,ch:"B"}, {t:"exit",x:20,y:12,who:"lantern"}, {t:"exit",x:29,y:15,who:"shade"} ],
+    spawn: { lantern:[11,15], shade:[2,15] } }
+];
+
+/* ---------------- state ---------------- */
+let mode = null;                 // "local" | "online" | null
+let myRole = null;
+let S = { phase: "title", lvl: 0, seq: 0 };
+let L = null;
+let players = {};
+let levers = { lantern: {}, shade: {} };
+let plates = { lantern: [], shade: [] };
+let chan = new Set();
+let lights = [];
+let pings = [], particles = [];
+let completing = null;
+let paused = false;
+let roomApi = null, gameRoom = null, roomCode = null, connected = false, peerHere = false;
+let myPing = null, lastPeerPing = null;
+let mouse = { x: W * 0.35, y: H * 0.45 };
+
+/* ---------------- level loading ---------------- */
+function loadLevel(i, preview) {
+  const def = LEVELS[i];
+  const g = blank(); def.build(g);
+  const ents = def.ents.map((e, k) => Object.assign({}, e, { id: "e" + k }));
+  const doors = new Map();
+  for (const e of ents) if (e.t === "door") for (let k = 0; k < e.h; k++) doors.set(e.x + "," + (e.y + k), e);
+  const specials = [];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (g[y][x] === "=" || g[y][x] === "~") specials.push([x, y]);
+  L = { i, def, g, ents, doors, specials, lit: new Set(), staticCv: null };
+  L.staticCv = renderStatic(L);
+  levers = { lantern: {}, shade: {} };
+  plates = { lantern: [], shade: [] };
+  players = {};
+  if (!preview) {
+    const roles = mode === "local" ? ["lantern", "shade"] : [myRole];
+    for (const r of roles) players[r] = spawnPlayer(r);
+  }
+  completing = null; particles = []; pings = [];
+  computeWorld();
+  updateHUD();
+}
+function spawnPlayer(role) {
+  const R = ROLES[role], sp = L.def.spawn[role];
+  return { role, w: R.w, h: R.h, x: sp[0] * T + (T - R.w) / 2, y: (sp[1] + 1) * T - R.h, vx: 0, vy: 0, f: 1,
+    onGround: false, coyote: 0, jbuf: 0, jumpsLeft: 0, sh: false, burn: 0, dead: 0, ex: false, ghost: new Set(), local: true, anim: 0, inLight: false };
+}
+function respawn(p) {
+  const n = spawnPlayer(p.role);
+  Object.assign(p, n);
+}
+
+/* ---------------- world rules ---------------- */
+function computeChannels() {
+  chan = new Set();
+  for (const e of L.ents) {
+    if (e.t === "lever" && levers[e.who] && levers[e.who][e.id]) chan.add(e.ch);
+    if (e.t === "plate" && (plates.lantern.includes(e.id) || plates.shade.includes(e.id))) chan.add(e.ch);
+  }
+}
+function lampOn(e) { if (!e.ch) return true; const a = chan.has(e.ch); return e.inv ? !a : a; }
+function computeLights() {
+  lights = [];
+  const lp = players.lantern;
+  if (lp && !(lp.dead > 0)) lights.push({ x: lp.x + lp.w / 2, y: lp.y + lp.h / 2, r: lp.sh ? SHUTTER_R : LANTERN_R, carried: true });
+  for (const e of L.ents) if (e.t === "lamp" && lampOn(e)) lights.push({ x: e.x * T + T / 2, y: e.y * T + T / 2, r: e.r });
+}
+function isLit(x, y) {
+  for (const l of lights) { const dx = x - l.x, dy = y - l.y; if (dx * dx + dy * dy < l.r * l.r) return true; }
+  return false;
+}
+function computeWorld() {
+  if (!L) return;
+  computeChannels(); computeLights();
+  L.lit = new Set();
+  for (const [x, y] of L.specials) if (isLit(x * T + T / 2, y * T + T / 2)) L.lit.add(x + "," + y);
+}
+function solidFor(tx, ty, p) {
+  if (tx < 0 || tx >= COLS || ty < 0) return true;
+  if (ty >= ROWS) return false;
+  const c = L.g[ty][tx], k = tx + "," + ty;
+  if (c === "#") return true;
+  if (c === "=") return L.lit.has(k);
+  if (c === "~") return !L.lit.has(k);
+  if (c === "|") return p.role === "lantern";
+  const d = L.doors.get(k);
+  if (d && !chan.has(d.ch)) return true;
+  return false;
+}
+function overlapTiles(p, fn) {
+  const x0 = Math.floor(p.x / T), x1 = Math.floor((p.x + p.w - 0.01) / T);
+  const y0 = Math.floor(p.y / T), y1 = Math.floor((p.y + p.h - 0.01) / T);
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) fn(tx, ty);
+}
+function moveAxis(p, dx, dy) {
+  p.x += dx; p.y += dy;
+  overlapTiles(p, (tx, ty) => {
+    if (p.ghost.has(tx + "," + ty) || !solidFor(tx, ty, p)) return;
+    if (dx > 0) { p.x = Math.min(p.x, tx * T - p.w); p.vx = 0; }
+    else if (dx < 0) { p.x = Math.max(p.x, (tx + 1) * T); p.vx = 0; }
+    if (dy > 0) { p.y = Math.min(p.y, ty * T - p.h); p.vy = 0; p.onGround = true; }
+    else if (dy < 0) { p.y = Math.max(p.y, (ty + 1) * T); p.vy = 0; }
+  });
+}
+function atExit(p) {
+  const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+  for (const e of L.ents) if (e.t === "exit" && e.who === p.role) {
+    if (cx > e.x * T - 4 && cx < (e.x + 1) * T + 4 && cy > (e.y - 1) * T && cy < (e.y + 1) * T) return true;
+  }
+  return false;
+}
+function die(p) {
+  if (p.dead > 0) return;
+  p.dead = 0.8;
+  const col = p.role === "lantern" ? "#FFB547" : "#A597FF";
+  for (let i = 0; i < 26; i++) {
+    const a = Math.random() * Math.PI * 2, s = 60 + Math.random() * 200;
+    particles.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 80, life: 0.8, max: 0.8, c: col, r: 2 + Math.random() * 2 });
+  }
+}
+
+function stepLocal(p, inp, dt) {
+  if (p.dead > 0) { p.dead -= dt; if (p.dead <= 0) respawn(p); return; }
+  // tiles that turned solid while we overlap them stay passable until we leave them
+  const ng = new Set();
+  overlapTiles(p, (tx, ty) => { if (solidFor(tx, ty, p)) ng.add(tx + "," + ty); });
+  p.ghost = ng;
+
+  const R = ROLES[p.role];
+  const dir = (inp.r ? 1 : 0) - (inp.l ? 1 : 0);
+  if (p.role === "lantern") p.sh = !!inp.sh;
+  const spd = R.speed * (p.role === "lantern" && p.sh ? 0.65 : 1);
+  p.vx += (dir * spd - p.vx) * Math.min(1, dt * (p.onGround ? 20 : 10));
+  if (dir) p.f = dir;
+  if (p.onGround) { p.coyote = 0.1; p.jumpsLeft = R.jumps - 1; } else p.coyote -= dt;
+  p.jbuf -= dt;
+  if (p.jbuf > 0) {
+    if (p.coyote > 0) { p.vy = -R.jump; p.coyote = 0; p.jbuf = 0; }
+    else if (p.jumpsLeft > 0) { p.vy = -R.jump * 0.86; p.jumpsLeft--; p.jbuf = 0; puff(p); }
+  }
+  p.vy += G * dt * (p.vy < 0 && !inp.j ? 2.2 : 1);
+  if (p.vy > MAXFALL) p.vy = MAXFALL;
+  p.onGround = false;
+  moveAxis(p, p.vx * dt, 0);
+  moveAxis(p, 0, p.vy * dt);
+  if (Math.abs(p.vx) > 20 && p.onGround) p.anim += dt * 12;
+
+  let hurt = false;
+  overlapTiles(p, (tx, ty) => { if (ty >= 0 && ty < ROWS && tx >= 0 && tx < COLS && L.g[ty][tx] === "^") hurt = true; });
+  if (p.y > H + 20) hurt = true;
+  p.ex = atExit(p);
+  if (p.role === "shade") {
+    const inL = isLit(p.x + p.w / 2, p.y + p.h / 2);
+    p.inLight = inL && !p.ex;
+    if (p.inLight) {
+      p.burn += dt / BURN_FILL;
+      if (Math.random() < dt * 40) particles.push({ x: p.x + Math.random() * p.w, y: p.y + Math.random() * p.h, vx: (Math.random() - .5) * 30, vy: -60 - Math.random() * 60, life: .5, max: .5, c: "#FF9A4A", r: 1.5 });
+    } else p.burn = Math.max(0, p.burn - dt / BURN_RECOVER);
+    if (p.burn >= 1) hurt = true;
+  }
+  if (hurt) die(p);
+}
+function puff(p) {
+  for (let i = 0; i < 8; i++) particles.push({ x: p.x + p.w / 2, y: p.y + p.h, vx: (Math.random() - .5) * 120, vy: 30 + Math.random() * 40, life: .4, max: .4, c: "#A597FF", r: 2 });
+}
+function tryInteract(p) {
+  if (!p || p.dead > 0) return;
+  for (const e of L.ents) {
+    if (e.t !== "lever" || e.who !== p.role) continue;
+    const ex = e.x * T, ey = e.y * T;
+    if (p.x < ex + T + 4 && p.x + p.w > ex - 4 && p.y < ey + T && p.y + p.h > ey) {
+      levers[p.role][e.id] = !levers[p.role][e.id];
+      for (let i = 0; i < 10; i++) particles.push({ x: ex + T / 2, y: ey + T / 2, vx: (Math.random() - .5) * 140, vy: -Math.random() * 120, life: .45, max: .45, c: CHC[e.ch], r: 2 });
+      return;
+    }
+  }
+}
+function updatePlates() {
+  for (const role of ["lantern", "shade"]) {
+    const p = players[role];
+    if (!p || !p.local) continue;
+    const on = [];
+    if (!(p.dead > 0)) for (const e of L.ents) {
+      if (e.t !== "plate") continue;
+      const ex = e.x * T, ey = e.y * T;
+      if (p.x < ex + T && p.x + p.w > ex && p.y < ey + T && p.y + p.h > ey + T - 6) on.push(e.id);
+    }
+    plates[role] = on;
+  }
+}
+
+/* ---------------- sync (online) ---------------- */
+const validRole = r => (r === "lantern" || r === "shade") ? r : null;
+const validPhase = ph => (ph === "lobby" || ph === "play" || ph === "won") ? ph : "lobby";
+const num = v => (typeof v === "number" && isFinite(v)) ? v : 0;
+function sanLevers(lv) {
+  const o = {};
+  if (lv && typeof lv === "object") for (const k of Object.keys(lv).slice(0, 40)) if (/^e\d{1,3}$/.test(k) && lv[k] === true) o[k] = true;
+  return o;
+}
+function sanPlates(pl) { return Array.isArray(pl) ? pl.filter(k => typeof k === "string" && /^e\d{1,3}$/.test(k)).slice(0, 20) : []; }
+function otherPeer() {
+  if (!gameRoom) return null;
+  let best = null;
+  for (const p of gameRoom.peers()) {
+    if (p.sameTab) continue;
+    const pr = p.presence;
+    if (!pr || pr.app !== "ls") continue;
+    if (!best || p.updatedAt > best.updatedAt) best = p;
+  }
+  return best;
+}
+function setS(n) {
+  let peerSeq = 0;
+  if (mode === "online") { const o = otherPeer(); peerSeq = num(o && o.presence && o.presence.S && o.presence.S.seq); }
+  S = { phase: n.phase, lvl: n.lvl, seq: Math.max(S.seq, peerSeq) + 1 };
+  applyS();
+  sendPresence(performance.now(), true);
+}
+function checkAdopt() {
+  const o = otherPeer();
+  const ps = o && o.presence && o.presence.S;
+  if (ps && typeof ps.seq === "number" && ps.seq > S.seq) {
+    S = { phase: validPhase(ps.phase), lvl: Math.max(0, Math.min(LEVELS.length - 1, Math.floor(num(ps.lvl)))), seq: ps.seq };
+    applyS();
+  }
+}
+function readPeer(dt) {
+  if (mode !== "online") return;
+  const o = otherPeer(); peerHere = !!o;
+  const pr = o && o.presence;
+  const other = myRole === "lantern" ? "shade" : "lantern";
+  if (!pr || validRole(pr.role) !== other || !pr.S || pr.S.seq !== S.seq || pr.S.phase !== "play" || typeof pr.x !== "number") {
+    players[other] = null; levers[other] = {}; plates[other] = []; return;
+  }
+  const R = ROLES[other];
+  const tx = Math.max(-40, Math.min(W + 40, num(pr.x))), ty = Math.max(-40, Math.min(H + 80, num(pr.y)));
+  let r = players[other];
+  if (!r) r = players[other] = { role: other, w: R.w, h: R.h, x: tx, y: ty, local: false, f: 1, anim: 0, burn: 0, dead: 0 };
+  const d = Math.hypot(tx - r.x, ty - r.y);
+  if (d > 140) { r.x = tx; r.y = ty; } else { const k = Math.min(1, dt * 16); r.x += (tx - r.x) * k; r.y += (ty - r.y) * k; }
+  if (Math.abs(tx - r.x) > 0.6) r.anim += dt * 12;
+  r.sh = pr.sh === true; r.ex = pr.ex === true; r.dead = pr.dead === true ? 1 : 0;
+  r.burn = Math.max(0, Math.min(1, num(pr.burn))); r.f = pr.f === -1 ? -1 : 1;
+  r.inLight = r.burn > 0.02 && other === "shade";
+  levers[other] = sanLevers(pr.lv); plates[other] = sanPlates(pr.pl);
+  if (pr.pg && typeof pr.pg.t === "number" && pr.pg.t !== lastPeerPing) {
+    lastPeerPing = pr.pg.t;
+    pings.push({ x: Math.max(0, Math.min(W, num(pr.pg.x))), y: Math.max(0, Math.min(H, num(pr.pg.y))), role: other, born: performance.now() });
+  }
+}
+let lastSend = 0;
+function sendPresence(now, force) {
+  if (!gameRoom) return;
+  if (!force && now - lastSend < 33) return;
+  lastSend = now;
+  const data = { app: "ls", role: myRole || null, S: { phase: S.phase, lvl: S.lvl, seq: S.seq } };
+  const p = players[myRole];
+  if (S.phase === "play" && p && p.local) {
+    Object.assign(data, { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, f: p.f, sh: !!p.sh, ex: !!p.ex,
+      dead: p.dead > 0, burn: Math.round(p.burn * 100) / 100, lv: levers[myRole], pl: plates[myRole] });
+  } else {
+    Object.assign(data, { x: null, y: null, lv: null, pl: null });
+  }
+  data.pg = myPing;
+  gameRoom.presence(data).catch(() => {});
+}
+
+/* ---------------- PeerJS room (self-hosted online play) ---------------- */
+const PREFIX = "lantern-shade-v1-";
+function peerRoom(code, host) {
+  return new Promise((resolve, reject) => {
+    if (typeof Peer === "undefined") { reject(new Error("nolib")); return; }
+    const peer = host ? new Peer(PREFIX + code) : new Peer();
+    let conn = null, remote = null, remoteAt = 0, mine = {}, isOpen = false, settled = false;
+    const peerFns = [], connFns = [];
+    const firePeers = () => { const snap = api.peers(); for (const f of peerFns) f({ peers: snap }); };
+    const fireConn = () => { for (const f of connFns) f(isOpen); };
+    function setup(c) {
+      if (conn && conn.open) { c.on("open", () => c.close()); return; }
+      conn = c;
+      c.on("open", () => { isOpen = true; fireConn(); c.send({ type: "p", data: mine }); firePeers(); });
+      c.on("data", d => { if (d && d.type === "p" && d.data && typeof d.data === "object") { remote = d.data; remoteAt = Date.now(); firePeers(); } });
+      c.on("close", () => { isOpen = false; remote = null; conn = null; fireConn(); firePeers(); });
+      c.on("error", () => {});
+    }
+    const api = {
+      presence(patch) {
+        for (const k of Object.keys(patch)) { if (patch[k] === null) delete mine[k]; else mine[k] = patch[k]; }
+        if (conn && conn.open) { try { conn.send({ type: "p", data: mine }); } catch (e) {} }
+        return Promise.resolve();
+      },
+      peers() {
+        const list = [{ sameTab: true, isMe: true, presence: mine, updatedAt: Date.now() }];
+        if (remote) list.push({ sameTab: false, isMe: false, presence: remote, updatedAt: remoteAt });
+        return list;
+      },
+      onPeers(f) { peerFns.push(f); return () => {}; },
+      onConnection(f) { connFns.push(f); setTimeout(() => f(isOpen), 0); return () => {}; },
+      leave() { try { peer.destroy(); } catch (e) {} return Promise.resolve(); }
+    };
+    peer.on("open", () => {
+      if (host) { settled = true; resolve(api); }
+      else {
+        const c = peer.connect(PREFIX + code, { reliable: true });
+        setup(c);
+        const to = setTimeout(() => { if (!settled) { settled = true; try { peer.destroy(); } catch (e) {} reject(new Error("notfound")); } }, 9000);
+        c.on("open", () => { clearTimeout(to); if (!settled) { settled = true; resolve(api); } });
+      }
+    });
+    if (host) peer.on("connection", setup);
+    peer.on("error", err => {
+      const t = err && err.type;
+      if (!settled) { settled = true; try { peer.destroy(); } catch (e) {} reject(new Error(t === "unavailable-id" ? "taken" : t === "peer-unavailable" ? "notfound" : "network")); }
+    });
+    peer.on("disconnected", () => { try { peer.reconnect(); } catch (e) {} });
+  });
+}
+
+/* ---------------- flow ---------------- */
+function showScreen(name) {
+  for (const id of ["title", "lobby", "menu", "win"]) $("#scr-" + id).classList.toggle("hidden", id !== name);
+}
+function applyS() {
+  paused = false;
+  if (S.phase === "play") {
+    if (mode === "online" && !myRole) { S.phase = "lobby"; applyS(); return; }
+    loadLevel(S.lvl, false); showScreen(null);
+  } else if (S.phase === "lobby") {
+    loadLevel(S.lvl, true); showScreen("lobby"); renderLobby();
+  } else if (S.phase === "won") {
+    loadLevel(LEVELS.length - 1, true); showScreen("win");
+  } else {
+    loadLevel(0, true); showScreen("title");
+  }
+  updateHUD();
+}
+function startLocal() {
+  mode = "local"; myRole = null;
+  S = { phase: "play", lvl: 0, seq: 1 }; applyS();
+}
+function makeCode() {
+  const a = "ABCDEFGHJKMNPQRSTUVWXYZ"; let s = "";
+  for (let i = 0; i < 4; i++) s += a[Math.floor(Math.random() * a.length)];
+  return s;
+}
+let joining = false;
+async function joinRoom(code, host) {
+  if (joining) return;
+  code = (code || "").toUpperCase().replace(/[^A-Z]/g, "");
+  if (code.length !== 4) { toast("Room codes are 4 letters."); return; }
+  joining = true; toast(host ? "Opening a room…" : "Looking for room " + code + "…");
+  let r;
+  try { r = await peerRoom(code.toLowerCase(), host); }
+  catch (e) {
+    joining = false;
+    const m = e.message;
+    if (m === "taken" && host) return joinRoom(makeCode(), true);
+    toast(m === "notfound" ? "No room called " + code + ". Check the code, and make sure your friend's room is still open."
+      : m === "nolib" ? "The online library didn't load. Check your internet connection and reload."
+      : "Couldn't connect. Check your internet connection and try again.");
+    return;
+  }
+  joining = false;
+  gameRoom = r; roomCode = code; mode = "online"; myRole = null; lastPeerPing = null; myPing = null;
+  S = { phase: "lobby", lvl: 0, seq: 0 };
+  gameRoom.onPeers(() => { checkAdopt(); if (S.phase === "lobby") renderLobby(); updateHUD(); });
+  gameRoom.onConnection(c => { connected = c; updateHUD(); }, () => { connected = false; updateHUD(); });
+  applyS();
+  sendPresence(performance.now(), true);
+}
+async function leaveGame() {
+  if (gameRoom) { try { await gameRoom.leave(); } catch (e) {} }
+  gameRoom = null; roomCode = null; mode = null; myRole = null; peerHere = false;
+  S = { phase: "title", lvl: 0, seq: 0 }; applyS();
+}
+
+function renderLobby() {
+  if (mode !== "online") return;
+  $("#room-code").textContent = roomCode;
+  const o = otherPeer();
+  const pr = o && o.presence;
+  const peerRole = validRole(pr && pr.role);
+  peerHere = !!o;
+  $("#partner-line").textContent = !o ? "Waiting for a friend to join. They open this same page, choose Join room and type the code."
+    : peerRole ? "Your friend is here and picked the " + (peerRole === "lantern" ? "Lantern." : "Shade.") : "Your friend is here. Pick who you'll play.";
+  for (const r of ["lantern", "shade"]) {
+    const el = $("#role-" + r);
+    el.classList.toggle("mine", myRole === r);
+    el.querySelector(".who").textContent = myRole === r && peerRole === r ? "You both picked this. One of you switch."
+      : myRole === r ? "You" : peerRole === r ? "Your friend" : "Open";
+    el.disabled = peerRole === r && myRole !== r;
+  }
+  renderChips($("#lobby-levels"), i => setS({ phase: "lobby", lvl: i }));
+  const btn = $("#btn-start"), why = $("#start-why");
+  let reason = "";
+  if (!myRole) reason = "Pick a role first.";
+  else if (!o) reason = "Waiting for your friend.";
+  else if (!peerRole) reason = "Waiting for your friend to pick a role.";
+  else if (peerRole === myRole) reason = "You each need a different role.";
+  btn.disabled = !!reason;
+  btn.textContent = "Start level " + (S.lvl + 1);
+  why.textContent = reason;
+}
+function renderChips(box, onPick) {
+  box.innerHTML = "";
+  LEVELS.forEach((lv, i) => {
+    const b = document.createElement("button");
+    b.className = "chip" + (i === S.lvl ? " on" : "");
+    b.textContent = (i + 1) + ". " + lv.name;
+    b.addEventListener("click", () => onPick(i));
+    box.appendChild(b);
+  });
+}
+function openMenu() {
+  if (S.phase !== "play") return;
+  if (mode === "local") paused = true;
+  $("#menu-note").textContent = mode === "online" ? "The game keeps running for your friend while this is open. Restarting or changing level moves you both. If the room creator leaves, the room closes." : "";
+  renderChips($("#menu-levels"), i => { showScreen(null); setS({ phase: "play", lvl: i }); });
+  showScreen("menu");
+}
+function closeMenu() { paused = false; showScreen(null); }
+
+function updateHUD() {
+  const inGame = S.phase === "play";
+  $("#lvl-name").textContent = inGame ? "Level " + (S.lvl + 1) + ": " + LEVELS[S.lvl].name : "Lantern & Shade";
+  const st = $("#status");
+  if (mode === "online") {
+    const here = peerHere;
+    st.innerHTML = "";
+    const dot = document.createElement("span"); dot.className = "dot" + (here && connected ? " on" : "");
+    st.appendChild(dot);
+    st.appendChild(document.createTextNode("Room " + roomCode + (myRole ? ", you're the " + (myRole === "lantern" ? "Lantern" : "Shade") : "") + (here ? "" : ", waiting for your friend")));
+  } else if (mode === "local") st.textContent = "One keyboard";
+  else st.textContent = "";
+  const hint = $("#hint"), ctl = $("#controls");
+  hint.innerHTML = ""; ctl.textContent = "";
+  if (!inGame || !L) return;
+  const h = LEVELS[S.lvl].hints;
+  const add = (cls, who, txt) => {
+    const d = document.createElement("div");
+    const b = document.createElement("b"); b.className = cls; b.textContent = who + ": ";
+    d.appendChild(b); d.appendChild(document.createTextNode(txt)); hint.appendChild(d);
+  };
+  if (mode === "local") {
+    add("l", "Lantern", h.lantern); add("s", "Shade", h.shade);
+    ctl.textContent = "Lantern: A D move, W jump, hold S to dim, E pulls levers. Shade: arrows move, ↑ jumps (twice in the air), ↓ pulls levers. R restarts, Esc opens the menu.";
+  } else if (myRole === "lantern") {
+    add("l", "Lantern", h.lantern);
+    ctl.textContent = "A D or arrows move. W, ↑ or Space jumps. Hold S or ↓ to dim. E or Enter pulls levers. Click the board to ping a spot. R restarts, Esc opens the menu.";
+  } else {
+    add("s", "Shade", h.shade);
+    ctl.textContent = "A D or arrows move. W, ↑ or Space jumps, twice in the air. S, ↓ or E pulls levers. Click the board to ping a spot. R restarts, Esc opens the menu.";
+  }
+  requestAnimationFrame(resize);
+}
+let toastTimer = 0;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 3200); }
+
+/* ---------------- input ---------------- */
+const keys = new Set(), pressed = new Set();
+const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"]);
+window.addEventListener("keydown", e => {
+  const typing = e.target && (e.target.tagName === "INPUT");
+  if (typing) { if (e.code === "Enter" && e.target.id === "in-code") joinRoom(e.target.value, false); return; }
+  if (S.phase === "play" && GAME_KEYS.has(e.code)) e.preventDefault();
+  if (!keys.has(e.code)) pressed.add(e.code);
+  keys.add(e.code);
+  if (e.code === "Escape") { if (!$("#scr-menu").classList.contains("hidden")) closeMenu(); else openMenu(); }
+  if (e.code === "KeyR" && S.phase === "play" && $("#scr-menu").classList.contains("hidden")) setS({ phase: "play", lvl: S.lvl });
+});
+window.addEventListener("keyup", e => keys.delete(e.code));
+window.addEventListener("blur", () => keys.clear());
+const any = (set, ...c) => c.some(k => set.has(k));
+function inputFor(role) {
+  if (mode === "local") {
+    if (role === "lantern") return { l: keys.has("KeyA"), r: keys.has("KeyD"), j: keys.has("KeyW"), jp: pressed.has("KeyW"), sh: keys.has("KeyS"), ip: pressed.has("KeyE") };
+    return { l: keys.has("ArrowLeft"), r: keys.has("ArrowRight"), j: keys.has("ArrowUp"), jp: pressed.has("ArrowUp"), sh: false, ip: pressed.has("ArrowDown") };
+  }
+  const base = { l: any(keys, "KeyA", "ArrowLeft"), r: any(keys, "KeyD", "ArrowRight"), j: any(keys, "KeyW", "ArrowUp", "Space"), jp: any(pressed, "KeyW", "ArrowUp", "Space") };
+  if (role === "lantern") return Object.assign(base, { sh: any(keys, "KeyS", "ArrowDown"), ip: any(pressed, "KeyE", "Enter") });
+  return Object.assign(base, { sh: false, ip: any(pressed, "KeyS", "ArrowDown", "KeyE", "Enter") });
+}
+const cv = $("#c"), ctx = cv.getContext("2d");
+function toWorld(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H }; }
+cv.addEventListener("pointerdown", e => {
+  if (S.phase !== "play" || mode !== "online" || !myRole) return;
+  const w = toWorld(e);
+  myPing = { x: Math.round(w.x), y: Math.round(w.y), t: Date.now() };
+  pings.push({ x: w.x, y: w.y, role: myRole, born: performance.now() });
+  sendPresence(performance.now(), true);
+});
+window.addEventListener("pointermove", e => {
+  const w = toWorld(e); mouse = w;
+  const t = $("#title"), r = t.getBoundingClientRect();
+  t.style.setProperty("--mx", (e.clientX - r.left) + "px"); t.style.setProperty("--my", (e.clientY - r.top) + "px");
+});
+
+/* ---------------- buttons ---------------- */
+$("#btn-local").addEventListener("click", startLocal);
+$("#btn-create").addEventListener("click", () => joinRoom(makeCode(), true));
+$("#btn-join").addEventListener("click", () => joinRoom($("#in-code").value, false));
+$("#btn-copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(roomCode); toast("Code copied."); } catch (e) { toast("Copy didn't work here. The code is " + roomCode + "."); } });
+for (const r of ["lantern", "shade"]) $("#role-" + r).addEventListener("click", () => { myRole = r; renderLobby(); updateHUD(); sendPresence(performance.now(), true); });
+$("#btn-start").addEventListener("click", () => setS({ phase: "play", lvl: S.lvl }));
+$("#btn-leave").addEventListener("click", leaveGame);
+$("#btn-resume").addEventListener("click", closeMenu);
+$("#btn-restart").addEventListener("click", () => { showScreen(null); setS({ phase: "play", lvl: S.lvl }); });
+$("#btn-quit").addEventListener("click", () => { if (mode === "online") setS({ phase: "lobby", lvl: S.lvl }); else leaveGame(); });
+$("#btn-again").addEventListener("click", () => setS({ phase: "play", lvl: 0 }));
+$("#btn-win-quit").addEventListener("click", () => { if (mode === "online") setS({ phase: "lobby", lvl: 0 }); else leaveGame(); });
+$("#btn-quit").textContent = "Leave game";
+
+/* ---------------- online availability ---------------- */
+$("#online-note").textContent = typeof Peer !== "undefined"
+  ? "Create a room and send your friend the 4-letter code. They open this same page, type the code and choose Join room. No accounts needed."
+  : "The online library didn't load, so only one-keyboard play works right now. Check your connection and reload.";
+if (typeof Peer === "undefined") { $("#btn-create").disabled = true; $("#btn-join").disabled = true; }
+
+/* ---------------- rendering ---------------- */
+const dark = document.createElement("canvas"); dark.width = W; dark.height = H;
+const dctx = dark.getContext("2d");
+let scale = 1, dpr = 1;
+function resize() {
+  const top = $("#hud-top"), bot = $("#hud-bottom");
+  const aw = window.innerWidth - 24;
+  const ah = window.innerHeight - top.offsetHeight - bot.offsetHeight - 44;
+  scale = Math.max(0.3, Math.min(aw / W, ah / H));
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const cw = Math.floor(W * scale), ch = Math.floor(H * scale);
+  cv.style.width = cw + "px"; cv.style.height = ch + "px";
+  cv.width = Math.floor(cw * dpr); cv.height = Math.floor(ch * dpr);
+  top.style.width = cw + "px"; bot.style.width = cw + "px";
+}
+window.addEventListener("resize", resize);
+
+function hash(x, y) { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; }
+function renderStatic(Lv) {
+  const c = document.createElement("canvas"); c.width = W * 2; c.height = H * 2;
+  const g = c.getContext("2d"); g.scale(2, 2);
+  const bg = g.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#161C48"); bg.addColorStop(1, "#0C1133");
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  // distant arches
+  g.strokeStyle = "rgba(160,170,255,0.045)"; g.lineWidth = 2;
+  for (let x = 60; x < W; x += 180) { g.beginPath(); g.moveTo(x, H); g.lineTo(x, 190); g.arc(x + 45, 190, 45, Math.PI, 0); g.lineTo(x + 90, H); g.stroke(); }
+  const air = (x, y) => y < 0 || y >= ROWS || x < 0 || x >= COLS || Lv.g[y][x] !== "#";
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const t = Lv.g[y][x], px = x * T, py = y * T;
+    if (t === "#") {
+      g.fillStyle = "#232A57"; g.fillRect(px, py, T, T);
+      g.fillStyle = "rgba(255,255,255,0.035)";
+      g.fillRect(px + 4 + hash(x, y) * 18, py + 6 + hash(y, x) * 16, 3, 2);
+      if (air(x, y - 1)) { g.fillStyle = "#3C4589"; g.fillRect(px, py, T, 4); }
+      if (air(x, y + 1)) { g.fillStyle = "#171C44"; g.fillRect(px, py + T - 3, T, 3); }
+      if (air(x - 1, y)) { g.fillStyle = "#2D3570"; g.fillRect(px, py, 2, T); }
+      if (air(x + 1, y)) { g.fillStyle = "#1A2049"; g.fillRect(px + T - 2, py, 2, T); }
+    } else if (t === "^") {
+      g.fillStyle = "#B84A66";
+      for (let k = 0; k < 3; k++) { g.beginPath(); g.moveTo(px + k * 10, py + T); g.lineTo(px + k * 10 + 5, py + 10); g.lineTo(px + k * 10 + 10, py + T); g.fill(); }
+    }
+  }
+  return c;
+}
+
+function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+function drawDynamicTiles(now) {
+  const t = now / 1000;
+  for (const [x, y] of L.specials) {
+    const px = x * T, py = y * T, lit = L.lit.has(x + "," + y), c = L.g[y][x];
+    if (c === "=") {
+      if (lit) {
+        ctx.fillStyle = "#E9C46A"; roundRect(ctx, px + 1, py + 2, T - 2, 11, 3); ctx.fill();
+        ctx.fillStyle = "#FFF0B8"; ctx.fillRect(px + 3, py + 3, T - 6, 2);
+      } else {
+        ctx.setLineDash([3, 4]); ctx.strokeStyle = "rgba(233,196,106,0.35)"; ctx.lineWidth = 1.5;
+        ctx.strokeRect(px + 2, py + 3, T - 4, 9); ctx.setLineDash([]);
+      }
+    } else {
+      if (!lit) {
+        ctx.fillStyle = "rgba(59,47,130,0.9)"; roundRect(ctx, px + 1, py + 2, T - 2, 12, 5); ctx.fill();
+        ctx.strokeStyle = "#8E7CFF"; ctx.lineWidth = 1.5; ctx.beginPath();
+        for (let k = 0; k <= T; k += 3) ctx.lineTo(px + k, py + 3 + Math.sin(t * 3 + k * 0.4 + x) * 1.5);
+        ctx.stroke();
+      } else {
+        ctx.setLineDash([2, 5]); ctx.strokeStyle = "rgba(142,124,255,0.3)"; ctx.lineWidth = 1.5;
+        ctx.strokeRect(px + 2, py + 3, T - 4, 10); ctx.setLineDash([]);
+      }
+    }
+  }
+  // veils
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (L.g[y][x] === "|") {
+    const px = x * T, py = y * T;
+    ctx.fillStyle = "rgba(70,48,150,0.28)"; ctx.fillRect(px, py, T, T);
+    ctx.strokeStyle = "rgba(150,130,255,0.45)"; ctx.lineWidth = 1.2;
+    for (let k = 0; k < 3; k++) {
+      ctx.beginPath();
+      for (let j = 0; j <= T; j += 3) ctx.lineTo(px + 6 + k * 9 + Math.sin(t * 2 + j * 0.25 + k * 2 + y) * 2.5, py + j);
+      ctx.stroke();
+    }
+  }
+}
+function ceilingAbove(x, y) { let yy = y - 1; while (yy > 0 && L.g[yy][x] !== "#") yy--; return (yy + 1) * T; }
+function drawSun(cx, cy, r, col) {
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2)); ctx.lineTo(cx + Math.cos(a) * (r + 5), cy + Math.sin(a) * (r + 5)); ctx.stroke(); }
+}
+function drawMoon(cx, cy, r, col, bg) {
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(cx + r * 0.5, cy - r * 0.3, r * 0.85, 0, Math.PI * 2); ctx.fill();
+}
+function drawEntities(now) {
+  const t = now / 1000;
+  for (const e of L.ents) {
+    const px = e.x * T, py = e.y * T;
+    if (e.t === "door") {
+      const open = chan.has(e.ch), col = CHC[e.ch];
+      if (!open) {
+        ctx.fillStyle = "rgba(20,24,60,0.85)"; ctx.fillRect(px + 2, py, T - 4, e.h * T);
+        ctx.fillStyle = col;
+        for (let k = 0; k < 3; k++) ctx.fillRect(px + 6 + k * 8, py, 3, e.h * T);
+        ctx.fillRect(px + 2, py, T - 4, 3); ctx.fillRect(px + 2, py + e.h * T - 3, T - 4, 3);
+      } else {
+        ctx.setLineDash([3, 5]); ctx.strokeStyle = col; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5;
+        ctx.strokeRect(px + 3, py + 1, T - 6, e.h * T - 2); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
+    } else if (e.t === "lever") {
+      const on = !!(levers[e.who] && levers[e.who][e.id]), col = CHC[e.ch];
+      ctx.fillStyle = e.who === "lantern" ? "#8A6A2E" : "#4B3E99";
+      roundRect(ctx, px + 6, py + T - 7, T - 12, 7, 2); ctx.fill();
+      const a = on ? 0.6 : -0.6, bx = px + T / 2, by = py + T - 6;
+      ctx.strokeStyle = "#C9C3E6"; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + Math.sin(a) * 15, by - Math.cos(a) * 15); ctx.stroke();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bx + Math.sin(a) * 15, by - Math.cos(a) * 15, 4, 0, Math.PI * 2); ctx.fill();
+      if (e.who === "lantern") drawSun(px + T / 2, py - 4, 3, "#FFB547"); else drawMoon(px + T / 2, py - 4, 4, "#A597FF", "#141A44");
+    } else if (e.t === "plate") {
+      const on = chan.has(e.ch) && (plates.lantern.includes(e.id) || plates.shade.includes(e.id));
+      ctx.fillStyle = CHC[e.ch]; ctx.globalAlpha = on ? 1 : 0.7;
+      roundRect(ctx, px + 3, py + T - (on ? 3 : 6), T - 6, on ? 3 : 6, 2); ctx.fill(); ctx.globalAlpha = 1;
+    } else if (e.t === "lamp") {
+      const on = lampOn(e), cy = py + T / 2, cx = px + T / 2, top = ceilingAbove(e.x, e.y);
+      ctx.strokeStyle = "#4A5292"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, cy - 8); ctx.stroke();
+      ctx.fillStyle = "#3A4180"; ctx.fillRect(cx - 6, cy - 9, 12, 3);
+      ctx.fillStyle = on ? "#FFE3A0" : "#2E2A4A"; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+      if (e.ch) { ctx.strokeStyle = CHC[e.ch]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, 9.5, 0, Math.PI * 2); ctx.stroke(); }
+    } else if (e.t === "exit") {
+      const x0 = px + 3, y0 = (e.y - 1) * T + 4, w = T - 6, h = 2 * T - 4;
+      const p = players[e.who], home = p && p.ex;
+      const col = e.who === "lantern" ? "#FFB547" : "#A597FF";
+      ctx.fillStyle = e.who === "lantern" ? "rgba(255,181,71,0.12)" : "rgba(165,151,255,0.14)";
+      ctx.beginPath(); ctx.moveTo(x0, y0 + h); ctx.lineTo(x0, y0 + w / 2); ctx.arc(x0 + w / 2, y0 + w / 2, w / 2, Math.PI, 0); ctx.lineTo(x0 + w, y0 + h); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = home ? 2.5 : 1.5; ctx.globalAlpha = home ? 1 : 0.75 + Math.sin(t * 2) * 0.15; ctx.stroke(); ctx.globalAlpha = 1;
+      if (e.who === "lantern") drawSun(x0 + w / 2, y0 + 16, 4, col); else drawMoon(x0 + w / 2, y0 + 16, 5, col, "#1B2050");
+    }
+  }
+}
+function drawLantern(p, t) {
+  const cx = p.x + p.w / 2, by = p.y + p.h, bob = p.onGround !== false && Math.abs(p.vx || 0) > 20 ? Math.sin(p.anim) * 1.5 : 0;
+  ctx.fillStyle = "#2F6272";
+  ctx.beginPath(); ctx.moveTo(cx - 9, by); ctx.lineTo(cx - 6, p.y + 11 + bob); ctx.lineTo(cx + 6, p.y + 11 + bob); ctx.lineTo(cx + 9, by); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#3B7A8C"; ctx.beginPath(); ctx.arc(cx, p.y + 8 + bob, 7.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#0F1A2A"; ctx.beginPath(); ctx.ellipse(cx + p.f * 2, p.y + 9 + bob, 4.5, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#FFDB94"; ctx.fillRect(cx + p.f * 3 - 1, p.y + 8 + bob, 2, 1.5);
+  const lx = cx + p.f * 10, ly = p.y + 15;
+  ctx.strokeStyle = "#7A5A2A"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx + p.f * 5, p.y + 14); ctx.lineTo(lx, ly - 5); ctx.stroke();
+  ctx.fillStyle = "#6E4F22"; ctx.fillRect(lx - 4, ly - 5, 8, 11);
+  const flick = p.sh ? 0.35 : 0.85 + Math.sin(t * 17) * 0.1;
+  ctx.fillStyle = `rgba(255,232,166,${flick})`; ctx.fillRect(lx - 2.5, ly - 3, 5, 7);
+}
+function drawShade(p, t, eyesOnly) {
+  const cx = p.x + p.w / 2, top = p.y + 2, by = p.y + p.h;
+  const burn = p.burn || 0;
+  if (!eyesOnly) {
+    ctx.fillStyle = "#150F2E";
+    ctx.beginPath();
+    ctx.arc(cx, top + 9, 10, Math.PI, 0);
+    ctx.lineTo(cx + 10, by - 4);
+    for (let k = 0; k <= 4; k++) { const xx = cx + 10 - k * 5; ctx.lineTo(xx, by - (k % 2 ? 0 : 5) + Math.sin(t * 6 + k) * 1.5); }
+    ctx.closePath(); ctx.fill();
+    const r = Math.round(165 + (255 - 165) * burn), gg = Math.round(151 + (154 - 151) * burn), b = Math.round(255 - (255 - 74) * burn);
+    ctx.strokeStyle = `rgb(${r},${gg},${b})`; ctx.lineWidth = 1.6; ctx.stroke();
+  }
+  ctx.fillStyle = eyesOnly ? "rgba(217,210,255,0.55)" : "#DCD5FF";
+  ctx.beginPath(); ctx.ellipse(cx - 3.5 + p.f * 2, top + 10, 2, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 3.5 + p.f * 2, top + 10, 2, 3, 0, 0, Math.PI * 2); ctx.fill();
+  if (burn > 0.02 && !eyesOnly) {
+    ctx.strokeStyle = "#FF9A4A"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(cx, p.y - 7, 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * burn); ctx.stroke();
+  }
+}
+function viewKind() {
+  if (S.phase !== "play") return "preview";
+  if (mode === "online") return myRole;
+  return "both";
+}
+function render(now) {
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+  if (!L) return;
+  const t = now / 1000, view = viewKind();
+  ctx.drawImage(L.staticCv, 0, 0, W, H);
+  drawDynamicTiles(now);
+  drawEntities(now);
+  // characters under darkness
+  const lp = players.lantern, sp = players.shade;
+  if (sp && !(sp.dead > 0)) drawShade(sp, t, false);
+  if (lp && !(lp.dead > 0)) drawLantern(lp, t);
+  // particles
+  for (const q of particles) { ctx.globalAlpha = Math.max(0, q.life / q.max); ctx.fillStyle = q.c; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2); ctx.fill(); }
+  ctx.globalAlpha = 1;
+
+  // darkness
+  let ls = lights;
+  if (view === "preview") ls = lights.concat([{ x: mouse.x, y: mouse.y, r: 150 }]);
+  const darkCol = view === "lantern" ? "rgba(6,8,26,0.86)" : view === "shade" ? "rgba(24,14,58,0.34)" : view === "preview" ? "rgba(8,10,32,0.8)" : "rgba(8,10,32,0.62)";
+  dctx.globalCompositeOperation = "source-over";
+  dctx.clearRect(0, 0, W, H);
+  dctx.fillStyle = darkCol; dctx.fillRect(0, 0, W, H);
+  dctx.globalCompositeOperation = "destination-out";
+  for (const l of ls) {
+    const gr = dctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r * 1.08);
+    gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(0.72, "rgba(0,0,0,0.95)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+    dctx.fillStyle = gr; dctx.beginPath(); dctx.arc(l.x, l.y, l.r * 1.08, 0, Math.PI * 2); dctx.fill();
+  }
+  ctx.drawImage(dark, 0, 0, W, H);
+  // warm glow / glare
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (const l of ls) {
+    const a = view === "shade" ? 0.42 : 0.14;
+    const gr = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
+    gr.addColorStop(0, `rgba(255,214,140,${a})`); gr.addColorStop(1, "rgba(255,214,140,0)");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  // the lantern player can always see the Shade's eyes, faintly
+  if (view === "lantern" && sp && !(sp.dead > 0)) drawShade(sp, t, true);
+
+  // pings
+  pings = pings.filter(p => now - p.born < 2200);
+  for (const p of pings) {
+    const k = (now - p.born) / 2200, col = p.role === "lantern" ? "255,181,71" : "165,151,255";
+    ctx.strokeStyle = `rgba(${col},${1 - k})`; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 8 + k * 38, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = `rgba(${col},${1 - k})`; ctx.beginPath(); ctx.moveTo(p.x, p.y - 6); ctx.lineTo(p.x + 5, p.y); ctx.lineTo(p.x, p.y + 6); ctx.lineTo(p.x - 5, p.y); ctx.fill();
+  }
+
+  // banner
+  const ban = $("#banner");
+  let msg = "";
+  if (S.phase === "play") {
+    if (completing) msg = "Both home.";
+    else if (mode === "online" && !players[myRole === "lantern" ? "shade" : "lantern"]) msg = peerHere ? "Waiting for your friend to catch up…" : "Waiting for your friend to rejoin…";
+    else if (lp && lp.ex && sp && !sp.ex) msg = "The Lantern is home. Now the Shade.";
+    else if (sp && sp.ex && lp && !lp.ex) msg = "The Shade is home. Now the Lantern.";
+  }
+  if (ban.textContent !== msg) ban.textContent = msg;
+  ban.classList.toggle("show", !!msg);
+}
+
+/* ---------------- loop ---------------- */
+let last = performance.now(), acc = 0, lobbyTick = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (mode === "online" && gameRoom) checkAdopt();
+  if (S.phase === "play" && L && !paused) {
+    readPeer(dt);
+    const locals = Object.values(players).filter(p => p && p.local);
+    const inputs = {};
+    for (const p of locals) {
+      const inp = inputFor(p.role); inputs[p.role] = inp;
+      if (inp.jp) p.jbuf = 0.12;
+      if (inp.ip) tryInteract(p);
+    }
+    acc += dt;
+    while (acc >= STEP) {
+      computeWorld();
+      for (const p of locals) stepLocal(p, inputs[p.role], STEP);
+      acc -= STEP;
+    }
+    updatePlates(); computeWorld();
+    const lp = players.lantern, sp = players.shade;
+    if (lp && sp && lp.ex && sp.ex && !(lp.dead > 0) && !(sp.dead > 0)) {
+      if (!completing) completing = { seq: S.seq, t: 1.3 };
+      completing.t -= dt;
+      if (completing.t <= 0 && completing.seq === S.seq) {
+        completing = null;
+        if (S.lvl + 1 < LEVELS.length) setS({ phase: "play", lvl: S.lvl + 1 }); else setS({ phase: "won", lvl: S.lvl });
+      }
+    } else completing = null;
+    sendPresence(now, false);
+  } else {
+    acc = 0;
+    if (mode === "online" && gameRoom) {
+      sendPresence(now, false);
+      lobbyTick += dt;
+      if (lobbyTick > 0.5 && S.phase === "lobby") { lobbyTick = 0; renderLobby(); updateHUD(); }
+    }
+  }
+  for (const q of particles) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 300 * dt; }
+  particles = particles.filter(q => q.life > 0);
+  if (reduceMotion && particles.length > 40) particles.length = 40;
+  render(now);
+  pressed.clear();
+  requestAnimationFrame(frame);
+}
+
+applyS();
+resize();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
